@@ -1,0 +1,19 @@
+[package]
+name = "rkt-libstage1"
+version = "0.0.0-dev"
+authors = ["Luca Bruno <luca.bruno@coreos.com>"]
+build = "build.rs"
+workspace = "../.."
+
+[build-dependencies]
+serde_codegen = "0.8"
+
+[dependencies]
+clap = { version = "2.19", default-features = false }
+error-chain = { version = "0.7.1", default-features = false }
+libc = "0.2"
+nix = "0.7"
+serde = "0.8"
+
+[lib]
+name = "rkt_stage1"

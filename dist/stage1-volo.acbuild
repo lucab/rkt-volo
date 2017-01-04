@@ -1,0 +1,20 @@
+#!/usr/bin/env acbuild-script
+
+begin
+
+  set-name aci.lucabruno.net/rkt/stage1-volo
+  annotation add coreos.com/rkt/stage1/interface-version 5
+  label add version 0.0.0-dev
+
+  copy-to-dir dist/aci-rootfs/rkt/status /rkt/
+  copy-to-dir dist/aci-rootfs/rkt/bin /rkt/
+  copy target/x86_64-unknown-linux-musl/release/volo /rkt/bin/volo
+
+  annotation add coreos.com/rkt/stage1/run /rkt/bin/run
+  annotation add coreos.com/rkt/stage1/gc /rkt/bin/gc
+  annotation add coreos.com/rkt/stage1/stop /rkt/bin/stop
+  annotation add coreos.com/rkt/stage1/enter /rkt/bin/enter
+
+  write --overwrite target/stage1-volo.aci
+
+end
