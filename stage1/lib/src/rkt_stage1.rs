@@ -3,6 +3,9 @@
 #[macro_use]
 extern crate error_chain;
 extern crate clap;
+extern crate semver;
+extern crate sha2;
+
 pub use clap::App;
 
 pub mod cli;

@@ -70,9 +70,9 @@ pub fn volo_run(logger: slog::Logger) -> errors::Result<Option<process::Command>
                     empty_vols.insert(&v.name, ());
                 }
                 appc::VolumeKind::Host => {
-                    let b = (v.source.clone().unwrap(),
+                    let b = (v.source.clone().unwrap_or("".into()),
                              path::PathBuf::from(""),
-                             v.recursive.unwrap(),
+                             v.recursive.unwrap_or(true),
                              0u64);
                     host_vols.insert(&v.name, b);
                 }

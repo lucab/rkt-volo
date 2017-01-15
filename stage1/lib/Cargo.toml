@@ -13,7 +13,9 @@ clap = { version = "2.19", default-features = false }
 error-chain = { version = "0.7.1", default-features = false }
 libc = "0.2"
 nix = "0.7"
+semver = "0.4"
 serde = "0.8"
+sha2 = "0.4"
 
 [lib]
 name = "rkt_stage1"

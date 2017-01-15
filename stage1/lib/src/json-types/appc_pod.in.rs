@@ -1,10 +1,16 @@
 use std::path::PathBuf;
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+// TODO(lucab): move these to newtypes with Deref coercion
+pub type AcVersion = String; // semver::Version
+pub type AcName = String;
+pub type AcIdentifier = String;
+pub type ImageID = String; // sha2::Sha512
+
+#[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
 pub struct PodManifest {
-    pub acVersion: String,
-    pub acKind: String,
+    pub acVersion: AcVersion,
+    pub acKind: AcKind,
     pub apps: Vec<App>,
     pub volumes: Option<Vec<Volume>>,
     pub isolators: Option<Vec<Isolator>>,
@@ -14,34 +20,39 @@ pub struct PodManifest {
     pub userLabels: Option<Vec<(String, String)>>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub enum AcKind {
+    ImageManifest,
+    PodManifest,
+}
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
 pub struct KV {
     pub name: String,
     pub value: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
 pub struct App {
-    pub name: String,
+    pub name: AcName,
     pub image: Image,
     pub app: AppImage,
     pub readOnlyRootFS: Option<bool>,
     pub mounts: Option<Vec<AppMount>>,
-    pub annotations: Option<Vec<KV>>
+    pub annotations: Option<Vec<Annotation>>
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
 pub struct AppMount {
-    pub volume: String,
+    pub volume: AcName,
     pub path: PathBuf,
     pub appVolume: Option<Volume>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
 pub struct AppImage {
     pub exec: Option<Vec<String>>,
@@ -51,17 +62,17 @@ pub struct AppImage {
     pub environment: Option<Vec<KV>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Image {
-    pub id: String,
-    pub name: Option<String>,
+    pub id: ImageID,
+    pub name: Option<AcIdentifier>,
     pub labels: Option<Vec<KV>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
 pub struct Volume {
-    pub name: String,
+    pub name: AcName,
     pub kind: VolumeKind,
     pub source: Option<PathBuf>,
     pub readOnly: Option<bool>,
@@ -79,21 +90,23 @@ pub enum VolumeKind {
     Host,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Isolator {
-    pub name: String,
+    pub name: AcIdentifier,
     pub value: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Annotation {
-    pub name: String,
+    pub name: AcName,
     pub value: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
 pub struct Port {
-    pub name: String,
+    pub name: AcName,
     pub hostPort: u32,
+    pub hostIP: Option<String>,
+    pub podPort: Option<String>,
 }
