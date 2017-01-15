@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use uuid;
 
 use std::io::Write;
-use std::os::unix::io::{FromRawFd, IntoRawFd};
+use std::os::unix::io::IntoRawFd;
 use std::os::unix::process::CommandExt;
 
 extern "C" {
@@ -176,20 +176,17 @@ pub fn volo_run(logger: slog::Logger) -> errors::Result<Option<process::Command>
                 }
             }
         };
-        // Consume and drop host root dirfd.
-        unsafe {
-            let r = fchdir(hostfd);
-            fs::File::from_raw_fd(hostfd);
-            if r != 0 {
-                bail!("fchdir failed");
-            };
+        // Chroot back to host rootfs (via its dirfd).
+        if unsafe { fchdir(hostfd) } != 0 {
+            bail!("fchdir failed");
         };
+        try!(unistd::close(hostfd));
+        try!(unistd::chroot(path::Path::new(".")));
         let suffix = match canon.is_absolute() {
             true => canon.strip_prefix("/").unwrap(),
             false => canon.as_path(),
         };
         m.set_target(app_rootfs.join(&suffix));
-        try!(unistd::chroot(path::Path::new(".")));
         try!(m.mount());
         slog_debug!(logger, "volume mounted";
                     "target" => format!("{}", m.target().display()));
