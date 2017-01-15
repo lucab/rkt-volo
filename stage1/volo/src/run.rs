@@ -60,8 +60,9 @@ pub fn volo_run(logger: slog::Logger) -> errors::Result<Option<process::Command>
     let pm: appc::PodManifest = try!(serde_json::from_reader(f));
     slog_debug!(logger, "manifest loaded";
                 "version" => pm.acVersion);
+    // TODO: move to better serde types
     let mut empty_vols: BTreeMap<&str, ()> = BTreeMap::new();
-    let mut host_vols: BTreeMap<&str, (&path::PathBuf)> = BTreeMap::new();
+    let mut host_vols: BTreeMap<&str, rkt_stage1::BindTuple> = BTreeMap::new();
     if let Some(ref volumes) = pm.volumes {
         for v in volumes.iter() {
             match v.kind {
@@ -69,7 +70,11 @@ pub fn volo_run(logger: slog::Logger) -> errors::Result<Option<process::Command>
                     empty_vols.insert(&v.name, ());
                 }
                 appc::VolumeKind::Host => {
-                    host_vols.insert(&v.name, (v.source.as_ref().unwrap()));
+                    let b = (v.source.clone().unwrap(),
+                             path::PathBuf::from(""),
+                             v.recursive.unwrap(),
+                             0u64);
+                    host_vols.insert(&v.name, b);
                 }
             };
         }
@@ -137,7 +142,7 @@ pub fn volo_run(logger: slog::Logger) -> errors::Result<Option<process::Command>
     // Prepare mounts
     for mut m in mountpoints {
         let hostfd = try!(fs::File::open("/")).into_raw_fd();
-        match m {
+        let canon = match m {
             rkt_stage1::AppMount::BindMount(ref mut bm) => {
                 if !bm.source.exists() {
                     bail!("missing bindmount source {}", bm.source.display());
@@ -145,38 +150,46 @@ pub fn volo_run(logger: slog::Logger) -> errors::Result<Option<process::Command>
                 let is_dir = bm.source.is_dir();
                 try!(unistd::chroot(&app_rootfs));
                 try!(unistd::chdir(path::Path::new("/")));
-                let canon = match (bm.target.canonicalize(), is_dir) {
+                match (bm.target.canonicalize(), is_dir) {
                     (Ok(p), _) => p,
                     (Err(_), true) => {
                         try!(fs::create_dir_all(&bm.target));
                         bm.target.canonicalize().unwrap_or(bm.target.clone())
-                    }
+                    },
                     (Err(_), false) => {
                         let parent = &bm.target.parent().unwrap_or(path::Path::new("/"));
                         try!(fs::create_dir_all(parent));
                         try!(fs::File::create(&bm.target));
                         bm.target.canonicalize().unwrap_or(bm.target.clone())
-                    }
-                };
-                // Consume and drop host root dirfd.
-                unsafe {
-                    let r = fchdir(hostfd);
-                    fs::File::from_raw_fd(hostfd);
-                    if r != 0 {
-                        bail!("fchdir failed");
-                    };
-                };
-                try!(unistd::chroot(path::Path::new(".")));
-                let suffix = match canon.is_absolute() {
-                    true => canon.strip_prefix("/").unwrap(),
-                    false => canon.as_path(),
-                };
-                bm.target = app_rootfs.join(&suffix);
+                    },
+                }
             }
-            rkt_stage1::AppMount::Mount(ref mut _bm) => {
-                bail!("TODO: implement empty mounts");
+            rkt_stage1::AppMount::Mount(ref mut em) => {
+                try!(unistd::chroot(&app_rootfs));
+                try!(unistd::chdir(path::Path::new("/")));
+                match em.target.canonicalize() {
+                    Ok(p) => p,
+                    Err(_) => {
+                        try!(fs::create_dir_all(&em.target));
+                        em.target.canonicalize().unwrap_or(em.target.clone())
+                    }
+                }
             }
         };
+        // Consume and drop host root dirfd.
+        unsafe {
+            let r = fchdir(hostfd);
+            fs::File::from_raw_fd(hostfd);
+            if r != 0 {
+                bail!("fchdir failed");
+            };
+        };
+        let suffix = match canon.is_absolute() {
+            true => canon.strip_prefix("/").unwrap(),
+            false => canon.as_path(),
+        };
+        m.set_target(app_rootfs.join(&suffix));
+        try!(unistd::chroot(path::Path::new(".")));
         try!(m.mount());
         slog_debug!(logger, "volume mounted";
                     "target" => format!("{}", m.target().display()));
@@ -204,7 +217,7 @@ pub fn volo_run(logger: slog::Logger) -> errors::Result<Option<process::Command>
 }
 
 fn parse_mounts(empty: BTreeMap<&str, ()>,
-                host: BTreeMap<&str, &path::PathBuf>,
+                host: BTreeMap<&str, rkt_stage1::BindTuple>,
                 mounts: Option<&Vec<appc::AppMount>>)
                 -> errors::Result<Vec<rkt_stage1::AppMount>> {
     let mut res = vec![];
@@ -222,19 +235,32 @@ fn parse_mounts(empty: BTreeMap<&str, ()>,
             if let Some(ref v) = m.appVolume {
                 match v.kind {
                     appc::VolumeKind::Empty => {
-                        bail!("TODO: implement empty volume for {}", m.volume);
+                        let emptymount = (path::PathBuf::from("tmpfs"),
+                                          "tmpfs".to_string(),
+                                          m.path.to_path_buf(),
+                                          false,
+                                          0u64,
+                                          vec![]);
+                        res.push(rkt_stage1::AppMount::from(emptymount));
                     }
                     appc::VolumeKind::Host => {
                         let source = v.source.clone().unwrap_or(path::PathBuf::from(""));
-                        let bind = (source, m.path.to_path_buf(), true, 0u64);
+                        let recursive = v.recursive.clone().unwrap_or(false);
+                        let bind = (source, m.path.to_path_buf(), recursive, 0u64);
                         res.push(rkt_stage1::AppMount::from(bind));
                     }
                 };
             } else if let Some(ref _k) = empty.get(m.volume.as_str()) {
-                bail!("TODO: implement empty volume for {}", m.volume);
-            } else if let Some(ref k) = host.get(m.volume.as_str()) {
-                let bind = (k.to_path_buf(), m.path.to_path_buf(), true, 0u64);
-                res.push(rkt_stage1::AppMount::from(bind));
+                let emptymount = (path::PathBuf::from("tmpfs"),
+                                  "tmpfs".to_string(),
+                                  m.path.to_path_buf(),
+                                  false,
+                                  0u64,
+                                  vec![]);
+                res.push(rkt_stage1::AppMount::from(emptymount));
+            } else if let Some(k) = host.get(m.volume.as_str()) {
+                let hostmount = (k.0.to_path_buf(), m.path.to_path_buf(), k.2, k.3);
+                res.push(rkt_stage1::AppMount::from(hostmount));
             } else {
                 bail!("missing volume {}", m.volume);
             };

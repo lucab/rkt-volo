@@ -18,7 +18,6 @@ pub struct Mount {
     pub source: std::path::PathBuf,
     pub fstype: String,
     pub target: std::path::PathBuf,
-    pub propagation: Propagation,
     pub recursive: bool,
     pub other_flags: u64,
     pub data: Vec<String>,
@@ -43,17 +42,16 @@ impl From<BindTuple> for AppMount {
     }
 }
 
-pub type MountTuple = (PathBuf, String, PathBuf, Propagation, bool, u64, Vec<String>);
+pub type MountTuple = (PathBuf, String, PathBuf, bool, u64, Vec<String>);
 impl From<MountTuple> for AppMount {
     fn from(v: MountTuple) -> Self {
         let m = Mount {
             source: v.0,
             fstype: v.1,
             target: v.2,
-            propagation: v.3,
-            recursive: v.4,
-            other_flags: v.5,
-            data: v.6,
+            recursive: v.3,
+            other_flags: v.4,
+            data: v.5,
         };
         return AppMount::Mount(m);
     }
@@ -67,7 +65,6 @@ impl AppMount {
                                   Some(x.fstype.as_str()),
                                   {
                                       let mut f = MsFlags::from_bits_truncate(x.other_flags);
-                                      f.insert(x.propagation.clone().into());
                                       if x.recursive {
                                           f.insert(nix::mount::MS_REC);
                                       };
@@ -92,7 +89,7 @@ impl AppMount {
         };
         return r.and(Ok(self));
     }
-    pub fn set_propagation(&self) -> nix::Result<&Self> {
+    pub fn change_propagation(&self) -> nix::Result<&Self> {
         return Ok(self);
     }
     pub fn target(&self) -> &PathBuf {
@@ -100,6 +97,13 @@ impl AppMount {
             AppMount::Mount(ref x) => &x.target,
             AppMount::BindMount(ref x) => &x.target,
         };
+    }
+    pub fn set_target(&mut self, p: PathBuf) -> &mut Self {
+        match *self {
+            AppMount::Mount(ref mut x) => x.target = p,
+            AppMount::BindMount(ref mut x) => x.target = p,
+        };
+        return self;
     }
 }
 
