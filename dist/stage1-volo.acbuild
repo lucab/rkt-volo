@@ -15,6 +15,4 @@ begin
   annotation add coreos.com/rkt/stage1/stop /rkt/bin/stop
   annotation add coreos.com/rkt/stage1/enter /rkt/bin/enter
 
-  write --overwrite target/stage1-volo.aci
-
-end
+write --overwrite target/stage1-volo.aci
