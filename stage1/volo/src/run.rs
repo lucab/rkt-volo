@@ -13,10 +13,6 @@ use std::io::Write;
 use std::os::unix::io::IntoRawFd;
 use std::os::unix::process::CommandExt;
 
-extern "C" {
-    fn fchdir(dirfd: libc::c_int) -> libc::c_int;
-}
-
 pub fn volo_run(logger: slog::Logger) -> errors::Result<Option<process::Command>> {
 
     // Parse command-line config.
@@ -177,7 +173,7 @@ pub fn volo_run(logger: slog::Logger) -> errors::Result<Option<process::Command>
             }
         };
         // Chroot back to host rootfs (via its dirfd).
-        if unsafe { fchdir(hostfd) } != 0 {
+        if unsafe { libc::fchdir(hostfd) } != 0 {
             bail!("fchdir failed");
         };
         try!(unistd::close(hostfd));
