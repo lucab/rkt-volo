@@ -3,6 +3,7 @@
 #[macro_use]
 extern crate error_chain;
 extern crate clap;
+extern crate parsswd;
 extern crate semver;
 extern crate sha2;
 
