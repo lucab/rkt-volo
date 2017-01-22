@@ -5,6 +5,7 @@ extern crate error_chain;
 extern crate clap;
 extern crate parsswd;
 extern crate semver;
+extern crate serde;
 extern crate sha2;
 
 pub use clap::App;

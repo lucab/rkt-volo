@@ -55,7 +55,7 @@ pub fn volo_run(logger: slog::Logger) -> errors::Result<Option<process::Command>
     let f = try!(fs::File::open("pod"));
     let pm: appc::PodManifest = try!(serde_json::from_reader(f));
     slog_debug!(logger, "manifest loaded";
-                "version" => pm.acVersion);
+                "version" => format!("{}", pm.acVersion));
     // TODO: move to better serde types
     let mut empty_vols: BTreeMap<&str, ()> = BTreeMap::new();
     let mut host_vols: BTreeMap<&str, rkt_stage1::BindTuple> = BTreeMap::new();

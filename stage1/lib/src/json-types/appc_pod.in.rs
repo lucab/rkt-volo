@@ -1,10 +1,66 @@
+use std::fmt;
 use std::path::PathBuf;
+use semver;
+use serde;
+
+use std::ops::Deref;
 
 // TODO(lucab): move these to newtypes with Deref coercion
-pub type AcVersion = String; // semver::Version
 pub type AcName = String;
 pub type AcIdentifier = String;
 pub type ImageID = String; // sha2::Sha512
+
+// appc custom type: AcVersion
+#[derive(Debug)]
+pub struct AcVersion(semver::Version);
+impl fmt::Display for AcVersion {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+impl serde::Serialize for AcVersion {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+        where S: serde::Serializer
+    {
+        serializer.serialize_newtype_struct("AcVersion", format!("{}", self.0))
+    }
+}
+impl serde::de::Deserialize for AcVersion {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: serde::Deserializer
+    {
+        struct AcVersionVisitor;
+        impl serde::de::Visitor for AcVersionVisitor {
+            type Value = AcVersion;
+
+            fn visit_newtype_struct<D>(&mut self,
+                                       deserializer: &mut D)
+                                       -> Result<Self::Value, D::Error>
+                where D: serde::Deserializer
+            {
+                return deserializer.deserialize_str(AcVersionVisitor);
+            }
+
+            fn visit_str<E>(&mut self, value: &str) -> Result<Self::Value, E>
+                where E: serde::de::Error
+            {
+                let ver = semver::Version::parse(value);
+                return match ver {
+                    Ok(v) => Ok(AcVersion(v)),
+                    Err(_) => Err(serde::de::Error::invalid_value(value)),
+                };
+            }
+        }
+
+        deserializer.deserialize_newtype_struct("AcVersion", AcVersionVisitor)
+    }
+}
+impl Deref for AcVersion {
+    type Target = semver::Version;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 #[allow(non_snake_case)]
@@ -41,7 +97,7 @@ pub struct App {
     pub app: AppImage,
     pub readOnlyRootFS: Option<bool>,
     pub mounts: Option<Vec<AppMount>>,
-    pub annotations: Option<Vec<Annotation>>
+    pub annotations: Option<Vec<Annotation>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
