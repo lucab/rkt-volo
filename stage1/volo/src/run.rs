@@ -5,7 +5,7 @@ use nix::{fcntl, unistd};
 use rkt_stage1::{self, appc, cli};
 use serde_json;
 use slog;
-use std::{fs, path, process};
+use std::{fs, io, path, process};
 use std::collections::BTreeMap;
 use uuid;
 
@@ -53,7 +53,7 @@ pub fn volo_run(logger: slog::Logger) -> errors::Result<Option<process::Command>
 
     // Load pod manifest.
     let f = try!(fs::File::open("pod"));
-    let pm: appc::PodManifest = try!(serde_json::from_reader(f));
+    let pm: appc::PodManifest = try!(serde_json::from_reader(io::BufReader::new(f)));
     slog_debug!(logger, "manifest loaded";
                 "version" => format!("{}", pm.acVersion));
     // TODO: move to better serde types
