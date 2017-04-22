@@ -10,7 +10,7 @@ error-chain = { version = "0.7", default-features = false }
 envy = "0.1"
 libc = "0.2.20"
 log = "0.3"
-nix = "0.7"
+nix = "0.8"
 serde = "0.8"
 serde_json = "0.8"
 slog = {version = "1.4", default-features = false, features = ["release_max_level_debug"] }
