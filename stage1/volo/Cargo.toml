@@ -6,7 +6,7 @@ workspace = "../.."
 
 [dependencies]
 clap = { version = "2.19", default-features = false }
-error-chain = { version = "0.7", default-features = false }
+error-chain = { version = "0.10", default-features = false }
 envy = "0.1"
 libc = "0.2.20"
 log = "0.3"

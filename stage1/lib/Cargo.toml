@@ -10,7 +10,7 @@ serde_codegen = "0.8"
 
 [dependencies]
 clap = { version = "2.19", default-features = false }
-error-chain = { version = "0.7.1", default-features = false }
+error-chain = { version = "0.10", default-features = false }
 libc = "0.2"
 nix = "0.8"
 parsswd = "0.1"
