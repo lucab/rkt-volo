@@ -35,7 +35,7 @@ pub fn volo_enter(logger: slog::Logger) -> errors::Result<Option<process::Comman
 
     let mut cmd = process::Command::new(exec_cmd);
     cmd.env_clear()
-        .args(&exec_args)
+        .args(exec_args)
         .current_dir(path::Path::new("/"));
     return Ok(Some(cmd));
 }
