@@ -7,7 +7,6 @@ fn main() {
     // serde codegen for json types
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let tt = vec![
-        "appc_pod",
         "runtime_app",
         "runtime_pod",
         "stage1_cli",

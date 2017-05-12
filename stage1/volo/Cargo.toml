@@ -5,14 +5,16 @@ authors = ["Luca Bruno <luca.bruno@coreos.com>"]
 workspace = "../.."
 
 [dependencies]
+appc = "0.0.1-dev.4"
 clap = { version = "2.19", default-features = false }
 error-chain = { version = "0.10", default-features = false }
 envy = "0.1"
 libc = "0.2.20"
 log = "0.3"
 nix = "0.8"
-serde = "0.8"
-serde_json = "0.8"
+serde = "1"
+serde_derive = "1"
+serde_json = "1"
 slog = {version = "1.4", default-features = false, features = ["release_max_level_debug"] }
 slog-stdlog = "1.1"
 slog-term = "1.3"

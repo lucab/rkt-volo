@@ -1,8 +1,9 @@
+use appc;
 use envy;
 use errors;
 use libc;
 use nix::{fcntl, unistd};
-use rkt_stage1::{self, appc, cli};
+use rkt_stage1::{self, cli};
 use serde_json;
 use slog;
 use std::{fs, io, path, process};
@@ -53,24 +54,24 @@ pub fn volo_run(logger: slog::Logger) -> errors::Result<Option<process::Command>
 
     // Load pod manifest.
     let f = try!(fs::File::open("pod"));
-    let pm: appc::PodManifest = try!(serde_json::from_reader(io::BufReader::new(f)));
+    let pm: appc::schema::PodManifest = try!(serde_json::from_reader(io::BufReader::new(f)));
     slog_debug!(logger, "manifest loaded";
-                "version" => format!("{}", pm.acVersion));
+                "version" => format!("{}", pm.ac_version));
     // TODO: move to better serde types
     let mut empty_vols: BTreeMap<&str, ()> = BTreeMap::new();
     let mut host_vols: BTreeMap<&str, rkt_stage1::BindTuple> = BTreeMap::new();
     if let Some(ref volumes) = pm.volumes {
         for v in volumes.iter() {
-            match v.kind {
-                appc::VolumeKind::Empty => {
-                    empty_vols.insert(&v.name, ());
+            match v {
+                &appc::schema::pod::Volume::Empty(ref ve) => {
+                    empty_vols.insert(&ve.name, ());
                 }
-                appc::VolumeKind::Host => {
-                    let b = (v.source.clone().unwrap_or("".into()),
+                &appc::schema::pod::Volume::Host(ref vh) => {
+                    let b = (vh.source.clone(),
                              path::PathBuf::from(""),
-                             v.recursive.unwrap_or(true),
+                             vh.recursive.unwrap_or(true),
                              0u64);
-                    host_vols.insert(&v.name, b);
+                    host_vols.insert(&vh.name, b);
                 }
             };
         }
@@ -80,7 +81,7 @@ pub fn volo_run(logger: slog::Logger) -> errors::Result<Option<process::Command>
     if pm.apps.len() != 1 {
         bail!("only one app supported in volo pods");
     }
-    let ref app = pm.apps[0].app;
+    let app = try!(pm.apps[0].app.as_ref().ok_or("missing app object"));
     let ref app_name = pm.apps[0].name;
     let app_mounts = pm.apps[0].mounts.as_ref();
     let app_rootfs = pod_dir.join("stage1")
@@ -97,7 +98,7 @@ pub fn volo_run(logger: slog::Logger) -> errors::Result<Option<process::Command>
         let e = try!(app.exec.as_ref().ok_or("no exec entrypoint".to_string()));
         try!(e.split_first().ok_or("empty exec entrypoint".to_string()))
     };
-    let workdir = match app.workingDirectory {
+    let workdir = match app.working_dir {
         Some(ref p) => p,
         None => path::Path::new("/"),
     };
@@ -106,8 +107,8 @@ pub fn volo_run(logger: slog::Logger) -> errors::Result<Option<process::Command>
         None => &[],
     };
     let mountpoints = try!(parse_mounts(empty_vols, host_vols, app_mounts));
-    let uid = try!(appc::resolve_uid(&app.user, &app_rootfs));
-    let gid = try!(appc::resolve_gid(&app.group, &app_rootfs));
+    let uid = try!(appc::usergroup::resolve_uid(&app.user, &app_rootfs));
+    let gid = try!(appc::usergroup::resolve_gid(&app.group, &app_rootfs));
     slog_debug!(logger, "stage2 entrypoint ready";
                 "uid" => uid,
                 "gid" => gid,
@@ -211,7 +212,7 @@ pub fn volo_run(logger: slog::Logger) -> errors::Result<Option<process::Command>
 
 fn parse_mounts(empty: BTreeMap<&str, ()>,
                 host: BTreeMap<&str, rkt_stage1::BindTuple>,
-                mounts: Option<&Vec<appc::AppMount>>)
+                mounts: Option<&Vec<appc::schema::pod::AppMount>>)
                 -> errors::Result<Vec<rkt_stage1::AppMount>> {
     let mut res = vec![];
     // Default mounts.
@@ -225,9 +226,9 @@ fn parse_mounts(empty: BTreeMap<&str, ()>,
     // Application mounts.
     if let Some(ref ms) = mounts {
         for m in ms.iter() {
-            if let Some(ref v) = m.appVolume {
-                match v.kind {
-                    appc::VolumeKind::Empty => {
+            if let Some(ref v) = m.app_volume {
+                match v {
+                    &appc::schema::pod::Volume::Empty(_) => {
                         let emptymount = (path::PathBuf::from("tmpfs"),
                                           "tmpfs".to_string(),
                                           m.path.to_path_buf(),
@@ -236,10 +237,9 @@ fn parse_mounts(empty: BTreeMap<&str, ()>,
                                           vec![]);
                         res.push(rkt_stage1::AppMount::from(emptymount));
                     }
-                    appc::VolumeKind::Host => {
-                        let source = v.source.clone().unwrap_or(path::PathBuf::from(""));
-                        let recursive = v.recursive.clone().unwrap_or(false);
-                        let bind = (source, m.path.to_path_buf(), recursive, 0u64);
+                    &appc::schema::pod::Volume::Host(ref vh) => {
+                        let recursive = vh.recursive.clone().unwrap_or(false);
+                        let bind = (vh.source.clone(), m.path.to_path_buf(), recursive, 0u64);
                         res.push(rkt_stage1::AppMount::from(bind));
                     }
                 };
