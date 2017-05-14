@@ -12,7 +12,6 @@ pub use clap::App;
 
 pub mod cli;
 pub mod errors;
-pub mod appc;
 
 pub use errors::*;
 

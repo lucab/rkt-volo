@@ -1,12 +1,15 @@
-use rkt_stage1;
+use appc;
 use clap;
-use nix;
-use log;
 use envy;
+use log;
+use nix;
+use rkt_stage1;
 use serde_json;
+
 error_chain!{
     links {
         Stage1(rkt_stage1::Error, rkt_stage1::ErrorKind);
+        Appc(appc::errors::Error, appc::errors::ErrorKind);
     }
 
     foreign_links {
